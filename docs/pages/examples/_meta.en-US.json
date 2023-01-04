@@ -5,5 +5,6 @@
   "contract-write-dynamic": "Contract Write (Dynamic Args)",
   "sign-message": "Sign Message",
   "sign-in-with-ethereum": "Sign-In with Ethereum",
+  "ssx": "Sign-In with Ethereum with SSX",
   "custom-connector": "Create Custom Connector"
 }
