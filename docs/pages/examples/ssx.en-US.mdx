@@ -22,15 +22,125 @@ Pretty cool, right?! You can refresh the window or disconnect your wallet, and y
 ## Overview
 
 ## Prerequisites
+Install [`ssx`](https://www.npmjs.com/package/@spruceid/ssx-react) and [`next-auth`](https://next-auth.js.org/getting-started/example#existing-project) with your package manager of choice:
 
+```plaintext
+<<<<<<< Updated upstream
+npm install @spruceid/ssx-react @spruceid/ssx-server next-auth
+=======
+npm install @spruceid/ssx-react next-auth
+>>>>>>> Stashed changes
+```
 ## Step 1: Connect Wallet
 
 Follow the [Connect Wallet](/examples/connect-wallet#step-1-configuring-connectors) guide to get this set up.
 
-## Step 2: Add NextAuth routes
+## Step 2: Add NextAuth API routes
+First, we will add an API route for Next-Auth and configure it with SSX. SSX provides configured `credentials` and `authorize` functions to create a NextAuth provider. SSX also provides a `session` function, but it is likely you will want to modify the contents of the function to provide specific session data from the server to the frontend client.
 
-## Step 3: Sign & Verify Message
+```ts filename="pages/api/auth/[...nextauth].ts" {10, 14-15, 25-31}
+import type { NextApiRequest, NextApiResponse } from "next";
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { SSXNextAuth } from "@spruceid/ssx-react/next-auth/backend";
+import { SSXServer } from "@spruceid/ssx-server";
+
+export default async function auth(req: NextApiRequest, res: NextApiResponse) {
+    const ssx = new SSXServer();
+    const { credentials, authorize } = SSXNextAuth(req, res, ssx);
+    const providers = [
+        CredentialsProvider({
+            name: "Ethereum",
+            credentials,
+            authorize,
+        }),
+    ];
+
+    return await NextAuth(req, res, {
+        providers,
+        session: {
+            strategy: "jwt",
+        },
+        secret: process.env.NEXT_AUTH_SECRET,
+        callbacks: {
+            session: (sessionData) => {
+                const { session, user, token } = sessionData;
+                if (session.user) {
+                    session.user.name = token.sub;
+                }
+                return session;
+            };,
+        },
+    });
+}
+```
+## Step 3: Add Providers to Frontend
+Next you'll add the provider to the frontend. This is done in the `pages/_app.tsx` file. You can also add the provider to a specific page, but we'll add it to the app so that it is available on all pages.
+
+```ts filename="pages/_app.tsx" {9-11, 35-43, 49, 50, 52,53}
+import { WagmiConfig, createClient, configureChains, mainnet } from 'wagmi'
+
+import { alchemyProvider } from 'wagmi/providers/alchemy'
+import { publicProvider } from 'wagmi/providers/public'
+
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask'
+import { WalletConnectConnector } from 'wagmi/connectors/walletConnect'
+
+import { SSXProvider } from '@spruceid/ssx-react';
+import { SSXNextAuthRouteConfig } from '@spruceid/ssx-react/next-auth/frontend';
+import { SessionProvider } from "next-auth/react";
+
+
+const { chains, provider, webSocketProvider } = configureChains(
+    [mainnet],
+    [alchemyProvider({ apiKey: 'yourAlchemyApiKey' }), publicProvider()],
+)
+
+// Set up client
+const client = createClient({
+    autoConnect: true,
+    connectors: [
+        new MetaMaskConnector({ chains }),
+        new WalletConnectConnector({
+            chains,
+            options: {
+                qrcode: true,
+            },
+        }),
+    ],
+    provider,
+    webSocketProvider,
+})
+
+const { server } = SSXNextAuthRouteConfig({ signInOptions: { callbackUrl: '/protected' } });
+const ssxConfig = {
+    siweConfig: {
+        domain: "localhost:3000",
+    },
+    providers: {
+        server,
+    },
+};
+
+// Pass client to React Context Provider
+function App({ Component, pageProps }) {
+    return (
+        <WagmiConfig client={client}>
+            <SSXProvider ssxConfig={ssxConfig}>
+                <SessionProvider session={pageProps.session} refetchInterval={0}>
+                    <Component {...pageProps} />
+                </SessionProvider>
+            </SSXProvider>
+        </WagmiConfig >
+    )
+}
+```
+## Step 3: Using SSX in your dapp
+Now that your dapp is configured to use SSX, you can sign-in, sign-out and access user session data. Here is an example of what this looks like on a user profile page.
+
 
 ## Wrap Up
+That's it! You now have a way for users to securely sign in to an app using Ethereum wallets. You can start building rich web apps that use persistent user sessions while still letting users control their login identity (and so much more). Check out the [SSX](https://docs.ssx.id) website for more info.
 
 ### Additional Resources
+
